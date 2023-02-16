@@ -1,0 +1,39 @@
+if SERVER then
+
+    SWEP.PrintName = "N-A-SWEP:0.1"
+    SWEP.Author = "N-A"
+    SWEP.Instructions = "Mouse1 - Copy NPC model"
+    SWEP.Category = "Other"
+
+    SWEP.ViewModelFOV = 62
+    SWEP.ViewModelFlip = false
+    SWEP.UseHands = true
+
+    SWEP.Spawnable = true
+    SWEP.AdminOnly = false
+    SWEP.Category = "Your Category"
+
+    SWEP.Primary.ClipSize = -1
+    SWEP.Primary.DefaultClip = -1
+    SWEP.Primary.Automatic = false
+    SWEP.Primary.Ammo = "none"
+
+    SWEP.Secondary.ClipSize = -1
+    SWEP.Secondary.DefaultClip = -1
+    SWEP.Secondary.Automatic = false
+    SWEP.Secondary.Ammo = "none"
+
+    function SWEP:PrimaryAttack()
+        if (CLIENT) then return end
+
+        local ply = self:GetOwner()
+        local tr = ply:GetEyeTrace()
+        local ent = tr.Entity
+
+        if (IsValid(ent) and ent:IsNPC()) then
+            local mdl = ent:GetModel()
+            ply:SetModel(mdl)
+        end
+    end
+
+end
