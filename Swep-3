@@ -1,0 +1,119 @@
+
+-- Основные сведения
+SWEP.PrintName 				= "N-SWEP"
+SWEP.Author 				= "N-A"
+SWEP.Instructions			= "Mouse1 - Boom"
+SWEP.Category 				= "Other"
+
+SWEP.Spawnable 				= true
+SWEP.AdminOnly 				= false
+-------------------	
+
+-- Патроны							
+SWEP.Primary.ClipSize		= -1
+SWEP.Primary.DefaultClip	= -1
+SWEP.Primary.Automatic		= false
+SWEP.Primary.Ammo			= "none"
+-- SWEP.Primary.Recoil		= 1
+-- SWEP.Primary.Damage 		= 1000
+-- SWEP.Primary.NumShots 	= 1
+-- SWEP.Primary.Spread 		= 0
+-- SWEP.Primary.Cone 		= 0
+-- SWEP.Primary.Delay 		= 5
+
+SWEP.ViewModel				= "models/weapons/c_arms.mdl"
+SWEP.WorldModel				= ""
+SWEP.ViewModelFlip 			= false
+SWEP.UseHands				= true
+SWEP.ViewModelFOV 			= 55
+-- SWEP.SetHoldType 		= "magic"
+SWEP.ShouldDropOnDie 		= 0
+							
+SWEP.Secondary.ClipSize		= -1
+SWEP.Secondary.DefaultClip	= -1
+SWEP.Secondary.Automatic	= false
+SWEP.Secondary.Ammo			= "none"
+-- SWEP.Secondary.Recoil	= 1
+-- SWEP.Secondary.Damage 	= 50
+-- SWEP.Secondary.NumShots 	= 1
+-- SWEP.Secondary.Spread 	= 0
+-- SWEP.Secondary.Cone 		= 0
+-- SWEP.Secondary.Delay 	= 5
+
+
+-- SWEP.HitDistance 		= 50
+-- SWEP.HitInclinatoin 		= 0.2
+-- SWEP.HitPushback 		= 3000
+-- SWEP.HitRare				= 1.00
+-- SWEP.MinDamage 			= 10
+-- SWEP.MaxDamage 			= 20
+------------------------
+
+SWEP.Weight					= 5
+SWEP.AutoSwitchTo			= false
+SWEP.AutoSwitchFrom			= false
+
+--- Позиция в Weapon Selector							
+SWEP.Slot					= 1
+SWEP.SlotPos				= 1
+SWEP.DrawAmmo				= false
+SWEP.DrawCrosshair			= true
+SWEP.Primary.Recoil 		= 1
+
+SWEP.NextStrike             = 0
+
+if SERVER then
+    AddCSLuaFile()
+end
+ 	local entSpeed = 1000
+    local entDamage = 1000
+    local entExplosionRadius = 200
+
+function SWEP:PrimaryAttack()
+    self:SetNextPrimaryFire(CurTime() + 1)
+
+    if SERVER then
+        local ply = self:GetOwner()
+        local tr = util.TraceLine({
+            start = ply:EyePos(),
+            endpos = ply:EyePos() + ply:EyeAngles():Forward() * 1000,
+            filter = ply
+        })
+
+        local pos = tr.HitPos
+        pos.z = pos.z + 500 -- Поднимаем точку на 500 юнитов над землей, чтобы метеорит падал с неба
+-- Создаём объект
+        local ent = ents.Create("prop_physics")
+        ent:SetModel("models/props_c17/oildrum001_explosive.mdl")
+        ent:SetPos(pos)
+        ent:Spawn()
+        ent:Activate()
+        ent:SetCollisionGroup(COLLISION_GROUP_PROJECTILE)
+        -- Устанавливает урон
+        local damageInfo = DamageInfo()
+        damageInfo:SetDamageType(DMG_BLAST)
+        damageInfo:SetDamage(entDamage)
+        damageInfo:SetInflictor(self.Owner)
+        damageInfo:SetAttacker(self.Owner)
+        ent:TakeDamageInfo(damageInfo)
+          -- Создаем взрыв в заданном радиусе
+        timer.Simple(3, function()
+            local explosion = ents.Create("env_explosion")
+            explosion:SetPos(ent:GetPos())
+            explosion:SetOwner(self.Owner)
+            explosion:SetKeyValue("iMagnitude", entExplosionRadius)
+            explosion:Spawn()
+            explosion:Fire("Explode", "", 0)
+end)
+        local phys = ent:GetPhysicsObject()
+        if IsValid(phys) then
+            phys:SetVelocity(Vector(0, 0, -1000))
+        end
+
+        timer.Simple(3, function() -- Через 3 секунды после создания удаляем метеорит
+            if IsValid(ent) then
+                ent:Remove()
+            end
+        end)
+    end
+end
