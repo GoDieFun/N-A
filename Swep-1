@@ -1,0 +1,188 @@
+if (SERVER) then
+
+end
+function SWEP:Initialize()
+	self:SetHoldType("magic")
+end
+
+if CLIENT then
+  function SWEP:DrawHUD()
+  -- Вычисляем координаты для рисования текста в центре нижней части экрана
+  local w, h = ScrW(), ScrH()
+  -- Рисуем текст с текущим значением Energy внутри полоски
+draw.SimpleText(self:GetNWInt("Energy"), "Default", w/2, h - 25, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+  -- -- Отрисовка фона
+  --   surface.SetDrawColor(0, 0, 0, 150)
+  --   surface.DrawRect(w/2 -150,h - 115, 300, 70)
+
+  --   -- Отрисовка кнопок
+  --   surface.SetFont("Default")
+  --   surface.SetTextColor(255, 255, 255, 255)
+  --   surface.SetTextPos(w/2 -150,h - 115, 300, 70)
+  --   surface.DrawText("Button 1")
+
+  --   surface.SetFont("Default")
+  --   surface.SetTextColor(255, 255, 255, 255)
+  --   surface.SetTextPos(100, 20)
+  --   surface.DrawText("Button 2")
+
+  --   surface.SetFont("Default")
+  --   surface.SetTextColor(255, 255, 255, 255)
+  --   surface.SetTextPos(180, 20)
+  --   surface.DrawText("Button 3")
+-- Рисуем задний фон
+  surface.SetDrawColor(0, 0, 0, 200)
+  surface.DrawRect(w/2 - 150, h - 40, 300, 30)
+
+  -- Рисуем прямоугольник для шкалы
+  surface.SetDrawColor(255, 255, 255)
+  surface.DrawOutlinedRect(w/2 - 110, h - 30, 222, 10)
+
+  -- Рассчитываем заполнение шкалы в зависимости от количества энергии
+  local energyFraction = self:GetNWInt("Energy") / 90
+  local energyWidth = energyFraction * 200
+
+  -- Рисуем заполнение шкалы
+  surface.SetDrawColor(20, 43, 252)
+  surface.DrawRect(w/2 - 110, h - 30, energyWidth, 10)
+  -- Рисуем текст с текущим значением Energy внутри полоски
+  local energyText = tostring(self:GetNWInt("Energy"))
+  surface.SetFont("Default")
+  local textWidth, textHeight = surface.GetTextSize(energyText)
+  draw.SimpleTextOutlined(energyText, "Default", w/2, h - 25, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER, 1, Color(0, 0, 0, 255))
+
+end
+
+end
+
+  function SWEP:Think()
+    local energy = self:GetNWInt("Energy")
+    energy = energy + .1 -- Пополняем энергию на 1 единицу
+    if energy > 100 then energy = 100 end -- Ограничиваем максимальное количество энергии
+    self:SetNWInt("Energy", energy) -- Обновляем количество энергии
+  end
+
+  local function MyHUD()
+    draw.SimpleText("Energy: " .. self:GetNWInt("Energy"), "DermaDefault", ScrW() / 2, ScrH() / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+  local ply = LocalPlayer()
+  if not IsValid(ply) or not ply:Alive() then return end
+  
+  local weapon = ply:GetActiveWeapon()
+  if not IsValid(weapon) or not weapon:IsWeapon() or not weapon:IsScripted() or not weapon:IsCarriedByLocalPlayer() then return end
+
+  -- Рисуем пользовательский интерфейс для SWEP
+ draw.SimpleText("Energy: " .. self:GetNWInt("Energy"), "DermaDefault", ScrW() / 2, ScrH() / 2, Color(255, 255, 255), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+
+	-- hook.Add("HUDPaint", "MyHUD", MyHUD)
+
+      end
+
+function SWEP:PrimaryAttack()
+	if not self:CanPrimaryAttack() then return end
+    -- Код для выполнения действия связанного с выстрелом
+    local owner = self:GetOwner()
+	local time_limit = 30 -- time in seconds
+	local trace = self.Owner:GetEyeTrace()
+	local pos = trace.HitPos + trace.HitNormal * 16
+
+	-- Energy 
+	
+    local energy = self:GetNWInt("Energy")
+
+    -- Уменьшаем количество энергии
+    energy = energy - 10
+
+    if energy < 0 then
+      energy = 0
+      self:SetNextPrimaryFire(CurTime() + 1) -- Задержка перед следующим выстрелом
+    else
+      self:SetNextPrimaryFire(CurTime() + 0.1) -- Задержка перед следующим выстрелом
+    end
+
+    self:SetNWInt("Energy", energy) -- Обновляем количество энергии
+
+
+	-- Создаём эффект огня
+	local fire = ents.Create("env_fire")
+	fire:SetPos(pos)
+	fire:SetParent(ent)
+	fire:Spawn()
+	fire:SetKeyValue("health", "5")
+	fire:SetKeyValue("firesize", "128")
+	fire:SetKeyValue("fireattack", "2")
+	fire:SetKeyValue("damagescale", "3")
+	fire:SetKeyValue("spawnflags", "4")
+	fire:Fire("StartFire", "", 0)
+	if trace.Hit then
+			local ent = trace.Entity
+			if IsValid(ent) then
+				ent:Ignite(time_limit)
+				timer.Create("FireTimer_" .. ent:EntIndex(), time_limit, 1, function()
+					if IsValid(ent) then
+						ent:Extinguish()
+					end
+				end)
+			end
+		end
+	self:SetNextPrimaryFire(CurTime() + 1)
+	-- create the energy strip effect
+	local effectData = EffectData()
+	effectData:SetOrigin(pos)
+	effectData:SetStart(self.Owner:GetShootPos())
+	util.Effect("StripOfEnergy", effectData)
+	
+	-- Звуковой эффект
+	self.Owner:EmitSound("ambient/fire/ignite.wav", 100, 100)
+	
+	self:TakePrimaryAmmo(1)
+
+end
+function SWEP:CanPrimaryAttack()
+    if self:GetNextPrimaryFire() > CurTime() then
+    	return false
+end
+    	if self:GetNWInt("Energy") < 10 then
+    		return false
+    end
+    return true
+end
+
+  function SWEP:SecondaryAttack()
+    if not self:CanSecondaryAttack() then return end
+    local energy = self:GetNWInt("Energy")
+    local ply = self:GetOwner()
+    local pos = ply:GetPos() + ply:GetForward() * 200 -- Позиция игрока + направление взгляда * 200
+
+    -- Перемещаем игрока на новую позицию
+    ply:SetPos(pos)
+    -- Уменьшаем количество энергии
+    energy = energy - 20
+
+    if energy < 20 then
+      energy = 0
+      self:SetNextSecondaryFire(CurTime() + 1) -- Задержка перед следующим выстрелом
+    else
+      self:SetNextSecondaryFire(CurTime() + 0.1) -- Задержка перед следующим выстрелом
+    end
+
+    self:SetNWInt("Energy", energy) -- Обновляем количество энергии
+
+    -- Код для выполнения действия связанного с выстрелом
+	self:SetNextSecondaryFire(CurTime() + 1) -- Задержка перед следующим использованием функции
+	-- self.Owner:EmitSound("ambient/energy/zap9.wav", 100, 100)
+ end
+
+  function SWEP:CanSecondaryAttack()
+    if self:GetNextSecondaryFire() > CurTime() then
+    	return false
+end
+    	if self:GetNWInt("Energy") < 20 then
+    		return false
+    end
+    return true
+end
+
+
+  function SWEP:Reload()
+  end
